@@ -1,6 +1,5 @@
 extern crate ansi_shim;
 
-// TODO: Handle html entities
 // TODO: Provide finalize method to check for errors when writing html footer
 
 use ansi_shim::{Terminal,Shim,Color,Style};
@@ -16,8 +15,11 @@ struct HtmlWriter<W: Write> {
 }
 
 const HEADER: &str = "\
+<!DOCTYPE html>
 <html>
 <head>
+    <title>ansi2html</title>
+    <meta charset='utf-8'/>
     <style>
         html {
             background: #212121;
@@ -73,6 +75,17 @@ impl<W: Write> Write for HtmlWriter<W> {
 }
 
 impl<W: Write> Terminal for HtmlWriter<W> {
+    fn print(&mut self, ch: char) -> io::Result<()> {
+        match ch {
+            '&' => write!(self.writer, "&amp;"),
+            '<' => write!(self.writer, "&lt;"),
+            '>' => write!(self.writer, "&gt;"),
+            '"' => write!(self.writer, "&#x27;"),
+            '\'' => write!(self.writer, "&#x2F;"),
+            _ => write!(self.writer, "{}", ch),
+        }
+    }
+
     fn set_fg_color(&mut self, color: Color) -> io::Result<()> {
         self.fg_color = color;
         self.reopen_span()
