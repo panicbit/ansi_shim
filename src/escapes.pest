@@ -1,0 +1,10 @@
+fg = _{ "3" ~ fg_color }
+bg = _{ "4" ~ bg_color }
+fg_color = { '0' .. '7' }
+bg_color = { '0' .. '7' }
+style = { '0' .. '8' }
+disp_attr = _{ fg | bg | style }
+
+cmd_disp = _{ (disp_attr ~ ";")* ~ disp_attr? ~ "m" }
+command = _{ cmd_disp }
+escape = _{ "\x1B[" ~ command ~ eoi }
