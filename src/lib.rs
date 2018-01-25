@@ -92,13 +92,17 @@ impl<T: Terminal> VteTerm<T> {
             45 => self.0.set_bg_color(Color::Magenta),
             46 => self.0.set_bg_color(Color::Cyan),
             47 => self.0.set_bg_color(Color::White),
-            _ => Ok(())
+            _ => {
+                println!("Unhandled format param: {}", param);
+                Ok(())
+            }
         };
     }
 }
 
 impl<T: Terminal> Perform for VteTerm<T> {
     fn print(&mut self, ch: char) {
+        println!("Print: {}", ch);
         self.0.print(ch);
     }
 
@@ -116,7 +120,13 @@ impl<T: Terminal> Perform for VteTerm<T> {
 
     fn csi_dispatch(&mut self, params: &[i64], intermediates: &[u8], ignore: bool, cmd: char) {
         match cmd {
-            'm' => for &param in params { self.handle_formatting(param) },
+            'm' => {
+                if params.is_empty() { self.handle_formatting(0) }
+                for &param in params {
+                    println!("Color: {}", param);
+                    self.handle_formatting(param);
+                }
+            },
             _ => {}
         }
         println!("CSI: {:?} {:?} {:?} {:?}", params, intermediates, ignore, cmd);
