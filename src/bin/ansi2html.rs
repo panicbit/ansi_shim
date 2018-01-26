@@ -1,4 +1,5 @@
 extern crate ansi_shim;
+extern crate env_logger;
 
 // TODO: Provide finalize method to check for errors when writing html footer
 
@@ -271,6 +272,7 @@ impl<W: Write> Drop for HtmlWriter<W> {
 }
 
 fn main() {
+    env_logger::Builder::new().parse("ansi_shim=debug").init();
     let path = args().nth(1).expect("The first argument needs to be the output file");
     let out = File::create(path).expect("output file");
     let out = HtmlWriter::new(out).expect("writing html init");

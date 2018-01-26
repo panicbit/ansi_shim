@@ -1,4 +1,5 @@
 extern crate vte;
+#[macro_use] extern crate log;
 
 // TODO: Improve code interpretation
 // TODO: Handle I/O errors somehow
@@ -160,7 +161,7 @@ impl<T: Terminal> VteTerm<T> {
                 106 => self.0.set_bg_color(BrightCyan),
                 107 => self.0.set_bg_color(BrightWhite),
                 _ => {
-                    println!("Unhandled SGR param: {}", param);
+                    debug!("Unhandled SGR param: {}", param);
                     Ok(())
                 }
             };
@@ -188,11 +189,11 @@ impl<T: Terminal> Perform for VteTerm<T> {
     fn csi_dispatch(&mut self, params: &[i64], intermediates: &[u8], ignore: bool, cmd: char) {
         match cmd {
             'm' => self.handle_formatting(params),
-            _ => println!("CSI: {:?} {:?} {:?} {:?}", params, intermediates, ignore, cmd),
+            _ => debug!("CSI: {:?} {:?} {:?} {:?}", params, intermediates, ignore, cmd),
         }
     }
 
     fn esc_dispatch( &mut self, params: &[i64], intermediates: &[u8], ignore: bool, byte: u8) {
-        println!("Esc: {:?} {:?} {:?} {:?}", params, intermediates, ignore, byte);
+        debug!("Esc: {:?} {:?} {:?} {:?}", params, intermediates, ignore, byte);
     }
 }
