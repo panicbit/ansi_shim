@@ -28,6 +28,43 @@ const HEADER: &str = "\
             background: #212121;
             color: #FFFFFF;
         }
+
+        .black { color: #212121; }
+        .red { color: #E51C23; }
+        .green { color: #259B24; }
+        .yellow { color: #FFEB3B; }
+        .blue { color: #5677FC; }
+        .magenta { color: #9C27B0; }
+        .cyan { color: #00BCD4; }
+        .white { color: #F5F5F5; }
+        .bright-black, .bold.black { color: #9E9E9E; }
+        .bright-red, .bold.red { color: #FF5177; }
+        .bright-green, .bold.green { color: #5AF158; }
+        .bright-yellow, .bold.yellow { color: #FFFF00; }
+        .bright-blue, .bold.blue { color: #6889FF; }
+        .bright-magenta, .bold.magenta { color: #E040FB; }
+        .bright-cyan, .bold.cyan { color: #18FFFF; }
+        .bright-white, .bold.white { color: #FFFFFF; }
+
+        .bg-black { background-color: #212121; }
+        .bg-red { background-color: #E51C23; }
+        .bg-green { background-color: #259B24; }
+        .bg-yellow { background-color: #FFEB3B; }
+        .bg-blue { background-color: #5677FC; }
+        .bg-magenta { background-color: #9C27B0; }
+        .bg-cyan { background-color: #00BCD4; }
+        .bg-white { background-color: #F5F5F5; }
+        .bg-bright-black { background-color: #9E9E9E; }
+        .bg-bright-red { background-color: #FF5177; }
+        .bg-bright-green { background-color: #5AF158; }
+        .bg-bright-yellow { background-color: #FFFF00; }
+        .bg-bright-blue { background-color: #6889FF; }
+        .bg-bright-magenta { background-color: #E040FB; }
+        .bg-bright-cyan { background-color: #18FFFF; }
+        .bg-bright-white { background-color: #FFFFFF; }
+
+        .bold { font-weight: bold; }
+
     </style>
 </head>
 <body>
@@ -52,13 +89,12 @@ impl<W: Write> HtmlWriter<W> {
     }
 
     fn open_span(&mut self) -> io::Result<()> {
-        let fg = if self.bold { self.fg_color.bright() } else { self.fg_color };
-        let fg = ansi_color_to_html(fg);
-        let bg = ansi_color_to_html(self.bg_color);
-
-        write!(self.writer, "<span style='color: {fg}; background: {bg}; {style}'>",
+        let fg = self.fg_color_class();
+        let bg = self.bg_color_class();
+        write!(self.writer, "<span class='{fg} {bg}{bold}' style='{style}'>",
             fg = fg,
             bg = bg,
+            bold = if self.bold { " bold" } else { "" },
             style = ansi_style_to_html(&self.styles),
         )
     }
@@ -80,6 +116,50 @@ impl<W: Write> HtmlWriter<W> {
         }
 
         Ok(())
+    }
+
+    fn fg_color_class(&self) -> &'static str {
+        use self::Color::*;
+        match self.fg_color {
+            Black => "black",
+            Red => "red",
+            Green => "green",
+            Yellow => "yellow",
+            Blue => "blue",
+            Magenta => "magenta",
+            Cyan => "cyan",
+            White => "white",
+            BrightBlack => "bright-black",
+            BrightRed => "bright-red",
+            BrightGreen => "bright-green",
+            BrightYellow => "bright-yellow",
+            BrightBlue => "bright-blue",
+            BrightMagenta => "bright-magenta",
+            BrightCyan => "bright-cyan",
+            BrightWhite => "bright-white",
+        }
+    }
+
+    fn bg_color_class(&self) -> &'static str {
+        use self::Color::*;
+        match self.bg_color {
+            Black => "bg-black",
+            Red => "bg-red",
+            Green => "bg-green",
+            Yellow => "bg-yellow",
+            Blue => "bg-blue",
+            Magenta => "bg-magenta",
+            Cyan => "bg-cyan",
+            White => "bg-white",
+            BrightBlack => "bg-bright-black",
+            BrightRed => "bg-bright-red",
+            BrightGreen => "bg-bright-green",
+            BrightYellow => "bg-bright-yellow",
+            BrightBlue => "bg-bright-blue",
+            BrightMagenta => "bg-bright-magenta",
+            BrightCyan => "bg-bright-cyan",
+            BrightWhite => "bg-bright-white",
+        }
     }
 }
 
@@ -143,37 +223,12 @@ impl<W: Write> Terminal for HtmlWriter<W> {
     }
 }
 
-fn ansi_color_to_html(color: Color) -> &'static str {
-    use ansi_shim::Color::*;
-
-    match color {
-        Black => "#212121",
-        Red => "#E51C23",
-        Green => "#259B24",
-        Yellow => "#FFEB3B",
-        Blue => "#5677FC",
-        Magenta => "#9C27B0",
-        Cyan => "#00BCD4",
-        White => "#F5F5F5",
-        BrightBlack => "#9E9E9E",
-        BrightRed => "#FF5177",
-        BrightGreen => "#5AF158",
-        BrightYellow => "#FFFF00",
-        BrightBlue => "#6889FF",
-        BrightMagenta => "#E040FB",
-        BrightCyan => "#18FFFF",
-        BrightWhite => "#FFFFFF",
-    }
-}
-
 fn ansi_style_to_html(styles: &BTreeSet<Style>) -> String {
     let mut css = String::new();
     let mut deco = String::new();
 
     for &style in styles {
         match style {
-            Style::Bold => css += "font-weight: bold;",
-            Style::Faint => css += "font-weight: lighter;",
             Style::Italic => css += "font-style: italic;",
             Style::Hidden => css += "visibility: hidden;",
             Style::Underline => deco += " underline",
