@@ -8,11 +8,18 @@ use std::env::args;
 use std::fs::File;
 use std::collections::BTreeSet;
 
+enum Blink {
+    Off,
+    Slow,
+    Fast,
+}
+
 struct HtmlWriter<W: Write> {
     writer: W,
     fg_color: Color,
     bg_color: Color,
     bold: bool,
+    blink: Blink,
     styles: BTreeSet<Style>,
     span_needs_reopen: bool,
 }
@@ -65,6 +72,10 @@ const HEADER: &str = "\
 
         .bold { font-weight: bold; }
 
+        .blink { animation: blink 1.5s steps(2, start) infinite; }
+        .blink-fast { animation: blink 1.0s steps(2, start) infinite; }
+        @keyframes blink { to { visibility: hidden; } }
+
     </style>
 </head>
 <body>
@@ -79,6 +90,7 @@ impl<W: Write> HtmlWriter<W> {
             fg_color: Color::White,
             bg_color: Color::Black,
             bold: false,
+            blink: Blink::Off,
             styles: BTreeSet::new(),
             span_needs_reopen: false,
         };
@@ -91,10 +103,15 @@ impl<W: Write> HtmlWriter<W> {
     fn open_span(&mut self) -> io::Result<()> {
         let fg = self.fg_color_class();
         let bg = self.bg_color_class();
-        write!(self.writer, "<span class='{fg} {bg}{bold}' style='{style}'>",
+        write!(self.writer, "<span class='{fg} {bg}{bold}{blink}' style='{style}'>",
             fg = fg,
             bg = bg,
             bold = if self.bold { " bold" } else { "" },
+            blink = match self.blink {
+                Blink::Off => "",
+                Blink::Slow => " blink",
+                Blink::Fast => " blink-fast",
+            },
             style = ansi_style_to_html(&self.styles),
         )
     }
@@ -103,9 +120,8 @@ impl<W: Write> HtmlWriter<W> {
         self.writer.write_all("</span>".as_bytes())
     }
 
-    fn reopen_span(&mut self) -> io::Result<()> {
+    fn reopen_span(&mut self) {
         self.span_needs_reopen = true;
-        Ok(())
     }
 
     fn execute_reopen_span(&mut self) -> io::Result<()> {
@@ -188,38 +204,39 @@ impl<W: Write> Terminal for HtmlWriter<W> {
     }
 
     fn set_fg_color(&mut self, color: Color) -> io::Result<()> {
+        self.reopen_span();
         self.fg_color = color;
-        self.reopen_span()
+        Ok(())
     }
 
     fn set_bg_color(&mut self, color: Color) -> io::Result<()> {
+        self.reopen_span();
         self.bg_color = color;
-        self.reopen_span()
+        Ok(())
     }
 
     fn reset_style(&mut self) -> io::Result<()> {
+        self.reopen_span();
         self.styles.clear();
         self.fg_color = Color::White;
         self.bg_color = Color::Black;
         self.bold = false;
-        self.reopen_span()
+        self.blink = Blink::Off;
+        Ok(())
     }
 
     fn add_style(&mut self, style: Style) -> io::Result<()> {
+        self.reopen_span();
+
         match style {
-            Style::Bold => {
-                self.bold = true;
-                return Ok(())
-            },
-            Style::Faint => {
-                self.bold = false;
-                return Ok(())
-            },
-            _ => {}
+            Style::BlinkSlow => self.blink = Blink::Slow,
+            Style::BlinkFast => self.blink = Blink::Fast,
+            Style::Bold => self.bold = true,
+            Style::Faint => self.bold = false,
+            _ => { self.styles.insert(style); },
         };
 
-        self.styles.insert(style);
-        self.reopen_span()
+        Ok(())
     }
 }
 
