@@ -6,12 +6,14 @@ use ansi_shim::{Terminal,Shim,Color,Style};
 use std::io::{self, Write};
 use std::env::args;
 use std::fs::File;
+use std::collections::BTreeSet;
 
 struct HtmlWriter<W: Write> {
     writer: W,
     fg_color: Color,
     bg_color: Color,
-    style: Style,
+    bold: bool,
+    styles: BTreeSet<Style>,
 }
 
 const HEADER: &str = "\
@@ -38,7 +40,8 @@ impl<W: Write> HtmlWriter<W> {
             writer,
             fg_color: Color::White,
             bg_color: Color::Black,
-            style: Style::Reset,
+            bold: false,
+            styles: BTreeSet::new(),
         };
         writer.write_all(HEADER.as_bytes())?;
         writer.open_span()?;
@@ -47,10 +50,14 @@ impl<W: Write> HtmlWriter<W> {
     }
 
     fn open_span(&mut self) -> io::Result<()> {
+        let fg = if self.bold { self.fg_color.bright() } else { self.fg_color };
+        let fg = ansi_color_to_html(fg);
+        let bg = ansi_color_to_html(self.bg_color);
+
         write!(self.writer, "<span style='color: {fg}; background: {bg}; {style}'>",
-            fg = ansi_color_to_html(self.fg_color, self.style == Style::Bright),
-            bg = ansi_color_to_html(self.bg_color, false),
-            style = ansi_style_to_html(self.style),
+            fg = fg,
+            bg = bg,
+            style = ansi_style_to_html(&self.styles),
         )
     }
 
@@ -96,49 +103,77 @@ impl<W: Write> Terminal for HtmlWriter<W> {
         self.reopen_span()
     }
 
-    fn set_style(&mut self, style: Style) -> io::Result<()> {
-        if style == Style::Reset {
-            self.bg_color = Color::Black;
-            self.fg_color = Color::White;
+    fn reset_style(&mut self) -> io::Result<()> {
+        self.styles.clear();
+        self.fg_color = Color::White;
+        self.bg_color = Color::Black;
+        self.bold = false;
+        self.reopen_span()
+    }
+
+    fn add_style(&mut self, style: Style) -> io::Result<()> {
+        match style {
+            Style::Bold => {
+                self.bold = true;
+                return Ok(())
+            },
+            Style::Faint => {
+                self.bold = false;
+                return Ok(())
+            },
+            _ => {}
         };
-        self.style = style;
+
+        self.styles.insert(style);
         self.reopen_span()
     }
 }
 
-fn ansi_color_to_html(color: Color, bright: bool) -> &'static str {
+fn ansi_color_to_html(color: Color) -> &'static str {
     use ansi_shim::Color::*;
 
-    match (color, bright) {
-        (Black, true) => "#9E9E9E",
-        (Red, true) => "#FF5177",
-        (Green, true) => "#5AF158",
-        (Yellow, true) => "#FFFF00",
-        (Blue, true) => "#6889FF",
-        (Magenta, true) => "#E040FB",
-        (Cyan, true) => "#18FFFF",
-        (White, true) => "#FFFFFF",
-        (Black, _) => "#212121",
-        (Red, _) => "#E51C23",
-        (Green, _) => "#259B24",
-        (Yellow, _) => "#FFEB3B",
-        (Blue, _) => "#5677FC",
-        (Magenta, _) => "#9C27B0",
-        (Cyan, _) => "#00BCD4",
-        (White, _) => "#F5F5F5",
+    match color {
+        Black => "#212121",
+        Red => "#E51C23",
+        Green => "#259B24",
+        Yellow => "#FFEB3B",
+        Blue => "#5677FC",
+        Magenta => "#9C27B0",
+        Cyan => "#00BCD4",
+        White => "#F5F5F5",
+        BrightBlack => "#9E9E9E",
+        BrightRed => "#FF5177",
+        BrightGreen => "#5AF158",
+        BrightYellow => "#FFFF00",
+        BrightBlue => "#6889FF",
+        BrightMagenta => "#E040FB",
+        BrightCyan => "#18FFFF",
+        BrightWhite => "#FFFFFF",
     }
 }
 
-fn ansi_style_to_html(style: Style) -> &'static str {
-    match style {
-        Style::Reset => "",
-        Style::Bright => "font-weight: bold;",
-        Style::Dim => "",
-        Style::Underscore => "text-decoration: underline;",
-        Style::Blink => "",
-        Style::Reverse => "",
-        Style::Hidden => "visibility: hidden;",
+fn ansi_style_to_html(styles: &BTreeSet<Style>) -> String {
+    let mut css = String::new();
+    let mut deco = String::new();
+
+    for &style in styles {
+        match style {
+            Style::Bold => css += "font-weight: bold;",
+            Style::Faint => css += "font-weight: lighter;",
+            Style::Italic => css += "font-style: italic;",
+            Style::Hidden => css += "visibility: hidden;",
+            Style::Underline => deco += " underline",
+            Style::Crossed => deco += " line-through",
+            _ => {},
+        };
     }
+
+    if !deco.is_empty() {
+        use std::fmt::Write;
+        write!(css, "text-decoration: {};", deco);
+    }
+
+    css
 }
 
 impl<W: Write> Drop for HtmlWriter<W> {

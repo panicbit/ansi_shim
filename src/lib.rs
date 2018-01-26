@@ -10,10 +10,11 @@ pub trait Terminal: Write {
     fn print(&mut self, ch: char) -> io::Result<()>;
     fn set_fg_color(&mut self, color: Color) -> io::Result<()>;
     fn set_bg_color(&mut self, color: Color) -> io::Result<()>;
-    fn set_style(&mut self, style: Style) -> io::Result<()>;
+    fn reset_style(&mut self) -> io::Result<()>;
+    fn add_style(&mut self, style: Style) -> io::Result<()>;
 }
 
-#[derive(Copy,Clone,PartialEq,Eq)]
+#[derive(Copy,Clone,Debug,PartialEq,Eq,Hash,PartialOrd,Ord)]
 pub enum Color {
     Black,
     Red,
@@ -23,17 +24,57 @@ pub enum Color {
     Magenta,
     Cyan,
     White,
+    BrightBlack,
+    BrightRed,
+    BrightGreen,
+    BrightYellow,
+    BrightBlue,
+    BrightMagenta,
+    BrightCyan,
+    BrightWhite,
 }
 
-#[derive(Copy,Clone,PartialEq,Eq)]
+impl Color {
+    pub fn normal(self) -> Color {
+        match self {
+            Color::BrightBlack => Color::Black,
+            Color::BrightRed => Color::Red,
+            Color::BrightGreen => Color::Green,
+            Color::BrightYellow => Color::Yellow,
+            Color::BrightBlue => Color::Blue,
+            Color::BrightMagenta => Color::Magenta,
+            Color::BrightCyan => Color::Cyan,
+            Color::BrightWhite => Color::White,
+            _ => self
+        }
+    }
+
+    pub fn bright(self) -> Color {
+        match self {
+            Color::Black => Color::BrightBlack,
+            Color::Red => Color::BrightRed,
+            Color::Green => Color::BrightGreen,
+            Color::Yellow => Color::BrightYellow,
+            Color::Blue => Color::BrightBlue,
+            Color::Magenta => Color::BrightMagenta,
+            Color::Cyan => Color::BrightCyan,
+            Color::White => Color::BrightWhite,
+            _ => self
+        }
+    }
+}
+
+#[derive(Copy,Clone,Debug,PartialEq,Eq,Hash,PartialOrd,Ord)]
 pub enum Style {
-    Reset,
-    Bright,
-    Dim,
-    Underscore,
-    Blink,
+    Bold,
+    Faint,
+    Italic,
+    Underline,
+    BlinkSlow,
+    BlinkFast,
     Reverse,
     Hidden,
+    Crossed,
 }
 
 pub struct Shim<T: Terminal> {
@@ -68,30 +109,55 @@ struct VteTerm<T: Terminal>(T);
 
 impl<T: Terminal> VteTerm<T> {
     fn handle_formatting(&mut self, param: i64) {
+        use self::Color::*;
+        use self::Style::*;
+
+        if param == 100 {
+            println!("####  SIGH");
+        }
+
         match param {
-            0 => self.0.set_style(Style::Reset),
-            1 => self.0.set_style(Style::Bright),
-            2 => self.0.set_style(Style::Dim),
-            3 => self.0.set_style(Style::Underscore),
-            4 => self.0.set_style(Style::Blink),
-            5 => self.0.set_style(Style::Reverse),
-            6 => self.0.set_style(Style::Hidden),
-            30 => self.0.set_fg_color(Color::Black),
-            31 => self.0.set_fg_color(Color::Red),
-            32 => self.0.set_fg_color(Color::Green),
-            33 => self.0.set_fg_color(Color::Yellow),
-            34 => self.0.set_fg_color(Color::Blue),
-            35 => self.0.set_fg_color(Color::Magenta),
-            36 => self.0.set_fg_color(Color::Cyan),
-            37 => self.0.set_fg_color(Color::White),
-            40 => self.0.set_bg_color(Color::Black),
-            41 => self.0.set_bg_color(Color::Red),
-            42 => self.0.set_bg_color(Color::Green),
-            43 => self.0.set_bg_color(Color::Yellow),
-            44 => self.0.set_bg_color(Color::Blue),
-            45 => self.0.set_bg_color(Color::Magenta),
-            46 => self.0.set_bg_color(Color::Cyan),
-            47 => self.0.set_bg_color(Color::White),
+            0 => self.0.reset_style(),
+            1 => self.0.add_style(Bold),
+            2 => self.0.add_style(Faint),
+            3 => self.0.add_style(Italic),
+            4 => self.0.add_style(Underline),
+            5 => self.0.add_style(BlinkSlow),
+            6 => self.0.add_style(BlinkFast),
+            7 => self.0.add_style(Reverse),
+            8 => self.0.add_style(Hidden),
+            30 => self.0.set_fg_color(Black),
+            31 => self.0.set_fg_color(Red),
+            32 => self.0.set_fg_color(Green),
+            33 => self.0.set_fg_color(Yellow),
+            34 => self.0.set_fg_color(Blue),
+            35 => self.0.set_fg_color(Magenta),
+            36 => self.0.set_fg_color(Cyan),
+            37 => self.0.set_fg_color(White),
+            40 => self.0.set_bg_color(Black),
+            41 => self.0.set_bg_color(Red),
+            42 => self.0.set_bg_color(Green),
+            43 => self.0.set_bg_color(Yellow),
+            44 => self.0.set_bg_color(Blue),
+            45 => self.0.set_bg_color(Magenta),
+            46 => self.0.set_bg_color(Cyan),
+            47 => self.0.set_bg_color(White),
+            90 => self.0.set_fg_color(BrightBlack),
+            91 => self.0.set_fg_color(BrightRed),
+            92 => self.0.set_fg_color(BrightGreen),
+            93 => self.0.set_fg_color(BrightYellow),
+            94 => self.0.set_fg_color(BrightBlue),
+            95 => self.0.set_fg_color(BrightMagenta),
+            96 => self.0.set_fg_color(BrightCyan),
+            97 => self.0.set_fg_color(BrightWhite),
+            100 => self.0.set_bg_color(BrightBlack),
+            101 => self.0.set_bg_color(BrightRed),
+            102 => self.0.set_bg_color(BrightGreen),
+            103 => self.0.set_bg_color(BrightYellow),
+            104 => self.0.set_bg_color(BrightBlue),
+            105 => self.0.set_bg_color(BrightMagenta),
+            106 => self.0.set_bg_color(BrightCyan),
+            107 => self.0.set_bg_color(BrightWhite),
             _ => {
                 println!("Unhandled format param: {}", param);
                 Ok(())
@@ -102,7 +168,6 @@ impl<T: Terminal> VteTerm<T> {
 
 impl<T: Terminal> Perform for VteTerm<T> {
     fn print(&mut self, ch: char) {
-        println!("Print: {}", ch);
         self.0.print(ch);
     }
 
