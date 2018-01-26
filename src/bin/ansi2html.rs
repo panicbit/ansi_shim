@@ -14,6 +14,7 @@ struct HtmlWriter<W: Write> {
     bg_color: Color,
     bold: bool,
     styles: BTreeSet<Style>,
+    span_needs_reopen: bool,
 }
 
 const HEADER: &str = "\
@@ -42,6 +43,7 @@ impl<W: Write> HtmlWriter<W> {
             bg_color: Color::Black,
             bold: false,
             styles: BTreeSet::new(),
+            span_needs_reopen: false,
         };
         writer.write_all(HEADER.as_bytes())?;
         writer.open_span()?;
@@ -66,13 +68,24 @@ impl<W: Write> HtmlWriter<W> {
     }
 
     fn reopen_span(&mut self) -> io::Result<()> {
-        self.close_span()?;
-        self.open_span()
+        self.span_needs_reopen = true;
+        Ok(())
+    }
+
+    fn execute_reopen_span(&mut self) -> io::Result<()> {
+        if self.span_needs_reopen {
+            self.close_span()?;
+            self.open_span()?;
+            self.span_needs_reopen = false;
+        }
+
+        Ok(())
     }
 }
 
 impl<W: Write> Write for HtmlWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.execute_reopen_span()?;
         self.writer.write(buf)
     }
 
@@ -83,6 +96,7 @@ impl<W: Write> Write for HtmlWriter<W> {
 
 impl<W: Write> Terminal for HtmlWriter<W> {
     fn print(&mut self, ch: char) -> io::Result<()> {
+        self.execute_reopen_span()?;
         match ch {
             '&' => write!(self.writer, "&amp;"),
             '<' => write!(self.writer, "&lt;"),
