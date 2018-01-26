@@ -108,61 +108,63 @@ impl<T: Terminal> Write for Shim<T> {
 struct VteTerm<T: Terminal>(T);
 
 impl<T: Terminal> VteTerm<T> {
-    fn handle_formatting(&mut self, param: i64) {
+    fn handle_formatting(&mut self, params: &[i64]) {
         use self::Color::*;
         use self::Style::*;
 
-        if param == 100 {
-            println!("####  SIGH");
+        if params.is_empty() {
+            self.0.reset_style();
         }
 
-        match param {
-            0 => self.0.reset_style(),
-            1 => self.0.add_style(Bold),
-            2 => self.0.add_style(Faint),
-            3 => self.0.add_style(Italic),
-            4 => self.0.add_style(Underline),
-            5 => self.0.add_style(BlinkSlow),
-            6 => self.0.add_style(BlinkFast),
-            7 => self.0.add_style(Reverse),
-            8 => self.0.add_style(Hidden),
-            30 => self.0.set_fg_color(Black),
-            31 => self.0.set_fg_color(Red),
-            32 => self.0.set_fg_color(Green),
-            33 => self.0.set_fg_color(Yellow),
-            34 => self.0.set_fg_color(Blue),
-            35 => self.0.set_fg_color(Magenta),
-            36 => self.0.set_fg_color(Cyan),
-            37 => self.0.set_fg_color(White),
-            40 => self.0.set_bg_color(Black),
-            41 => self.0.set_bg_color(Red),
-            42 => self.0.set_bg_color(Green),
-            43 => self.0.set_bg_color(Yellow),
-            44 => self.0.set_bg_color(Blue),
-            45 => self.0.set_bg_color(Magenta),
-            46 => self.0.set_bg_color(Cyan),
-            47 => self.0.set_bg_color(White),
-            90 => self.0.set_fg_color(BrightBlack),
-            91 => self.0.set_fg_color(BrightRed),
-            92 => self.0.set_fg_color(BrightGreen),
-            93 => self.0.set_fg_color(BrightYellow),
-            94 => self.0.set_fg_color(BrightBlue),
-            95 => self.0.set_fg_color(BrightMagenta),
-            96 => self.0.set_fg_color(BrightCyan),
-            97 => self.0.set_fg_color(BrightWhite),
-            100 => self.0.set_bg_color(BrightBlack),
-            101 => self.0.set_bg_color(BrightRed),
-            102 => self.0.set_bg_color(BrightGreen),
-            103 => self.0.set_bg_color(BrightYellow),
-            104 => self.0.set_bg_color(BrightBlue),
-            105 => self.0.set_bg_color(BrightMagenta),
-            106 => self.0.set_bg_color(BrightCyan),
-            107 => self.0.set_bg_color(BrightWhite),
-            _ => {
-                println!("Unhandled format param: {}", param);
-                Ok(())
-            }
-        };
+        for &param in params {
+            match param {
+                0 => self.0.reset_style(),
+                1 => self.0.add_style(Bold),
+                2 => self.0.add_style(Faint),
+                3 => self.0.add_style(Italic),
+                4 => self.0.add_style(Underline),
+                5 => self.0.add_style(BlinkSlow),
+                6 => self.0.add_style(BlinkFast),
+                7 => self.0.add_style(Reverse),
+                8 => self.0.add_style(Hidden),
+                30 => self.0.set_fg_color(Black),
+                31 => self.0.set_fg_color(Red),
+                32 => self.0.set_fg_color(Green),
+                33 => self.0.set_fg_color(Yellow),
+                34 => self.0.set_fg_color(Blue),
+                35 => self.0.set_fg_color(Magenta),
+                36 => self.0.set_fg_color(Cyan),
+                37 => self.0.set_fg_color(White),
+                40 => self.0.set_bg_color(Black),
+                41 => self.0.set_bg_color(Red),
+                42 => self.0.set_bg_color(Green),
+                43 => self.0.set_bg_color(Yellow),
+                44 => self.0.set_bg_color(Blue),
+                45 => self.0.set_bg_color(Magenta),
+                46 => self.0.set_bg_color(Cyan),
+                47 => self.0.set_bg_color(White),
+                90 => self.0.set_fg_color(BrightBlack),
+                91 => self.0.set_fg_color(BrightRed),
+                92 => self.0.set_fg_color(BrightGreen),
+                93 => self.0.set_fg_color(BrightYellow),
+                94 => self.0.set_fg_color(BrightBlue),
+                95 => self.0.set_fg_color(BrightMagenta),
+                96 => self.0.set_fg_color(BrightCyan),
+                97 => self.0.set_fg_color(BrightWhite),
+                100 => self.0.set_bg_color(BrightBlack),
+                101 => self.0.set_bg_color(BrightRed),
+                102 => self.0.set_bg_color(BrightGreen),
+                103 => self.0.set_bg_color(BrightYellow),
+                104 => self.0.set_bg_color(BrightBlue),
+                105 => self.0.set_bg_color(BrightMagenta),
+                106 => self.0.set_bg_color(BrightCyan),
+                107 => self.0.set_bg_color(BrightWhite),
+                _ => {
+                    println!("Unhandled SGR param: {}", param);
+                    Ok(())
+                }
+            };
+        }
     }
 }
 
@@ -185,16 +187,9 @@ impl<T: Terminal> Perform for VteTerm<T> {
 
     fn csi_dispatch(&mut self, params: &[i64], intermediates: &[u8], ignore: bool, cmd: char) {
         match cmd {
-            'm' => {
-                if params.is_empty() { self.handle_formatting(0) }
-                for &param in params {
-                    println!("Color: {}", param);
-                    self.handle_formatting(param);
-                }
-            },
-            _ => {}
+            'm' => self.handle_formatting(params),
+            _ => println!("CSI: {:?} {:?} {:?} {:?}", params, intermediates, ignore, cmd),
         }
-        println!("CSI: {:?} {:?} {:?} {:?}", params, intermediates, ignore, cmd);
     }
 
     fn esc_dispatch( &mut self, params: &[i64], intermediates: &[u8], ignore: bool, byte: u8) {
