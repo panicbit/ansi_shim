@@ -1,0 +1,8 @@
+[package]
+name = "ansi2win"
+version = "0.1.0"
+authors = ["panicbit <panicbit.dev@gmail.com>"]
+
+[dependencies]
+ansi_shim = { path = "../" }
+winapi = "0.3.4"
