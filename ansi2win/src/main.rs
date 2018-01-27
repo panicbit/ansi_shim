@@ -4,6 +4,7 @@ extern crate ansi_shim;
 use ansi_shim::{Terminal,Color,Style,Shim};
 use std::ptr;
 use std::mem;
+use winapi::shared::minwindef::WORD;
 
 use winapi::um::wincon::*;
 use std::io::{self, Write};
@@ -25,12 +26,35 @@ fn main() {
 
 struct WinTerm {
     handle: HANDLE, 
+    bold: bool,
 }
 
 impl WinTerm {
     pub fn new() -> Self {
         Self {
             handle: unsafe { GetStdHandle(STD_OUTPUT_HANDLE) },
+            bold: false,
+        }
+    }
+}
+
+impl WinTerm {
+    fn get_text_attributes(&self) -> Option<WORD> {
+        unsafe {
+            let mut info: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
+
+            if GetConsoleScreenBufferInfo(self.handle, &mut info) == 0 {
+                return None;
+            }
+
+            Some(info.wAttributes)
+        }
+    }
+
+    fn set_text_attributes(&mut self, attrs: WORD) {
+        unsafe {
+            self.flush();
+            SetConsoleTextAttribute(self.handle, attrs);
         }
     }
 }
@@ -43,16 +67,16 @@ impl Terminal for WinTerm {
 
     fn set_fg_color(&mut self, color: Color) -> io::Result<()> {
         unsafe {
-            self.flush()?;
-
-            let mut info: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
-            if GetConsoleScreenBufferInfo(self.handle, &mut info) == 0 {
-                return Ok(());
-            }
-
-            let mut attrs = info.wAttributes;
+            let mut attrs = match self.get_text_attributes() {
+                None => return Ok(()),
+                Some(attrs) => attrs,
+            };
 
             attrs &= !(FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+
+            if self.bold {
+                attrs |= FOREGROUND_INTENSITY;
+            }
 
             let color = match color {
                 Color::Black => 0,
@@ -76,7 +100,7 @@ impl Terminal for WinTerm {
 
             attrs |= color;
 
-            SetConsoleTextAttribute(self.handle, attrs);
+            self.set_text_attributes(attrs);
 
             Ok(())
         }
@@ -84,14 +108,10 @@ impl Terminal for WinTerm {
 
     fn set_bg_color(&mut self, color: Color) -> io::Result<()> {
         unsafe {
-            self.flush()?;
-
-            let mut info: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
-            if GetConsoleScreenBufferInfo(self.handle, &mut info) == 0 {
-                return Ok(());
-            }
-
-            let mut attrs = info.wAttributes;
+            let mut attrs = match self.get_text_attributes() {
+                None => return Ok(()),
+                Some(attrs) => attrs,
+            };
 
             attrs &= !(BACKGROUND_RED | BACKGROUND_BLUE | BACKGROUND_GREEN | BACKGROUND_INTENSITY);
 
@@ -117,40 +137,36 @@ impl Terminal for WinTerm {
 
             attrs |= color;
 
-            SetConsoleTextAttribute(self.handle, attrs);
+            self.set_text_attributes(attrs);
 
             Ok(())
         }
     }
 
     fn reset_style(&mut self) -> io::Result<()> {
-        self.flush()?;
-
-        unsafe {
-            let attrs = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
-            SetConsoleTextAttribute(self.handle, attrs);
-            Ok(())
-        }
+        let attrs = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+        self.set_text_attributes(attrs);
+        self.bold = false;
+        Ok(())
     }
 
     fn add_style(&mut self, style: Style) -> io::Result<()> {
         unsafe {
-            self.flush()?;
+            let mut attrs = match self.get_text_attributes() {
+                None => return Ok(()),
+                Some(attrs) => attrs,
+            };
 
             match style {
                 Style::Bold => {
-                    let mut info: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
-                    if GetConsoleScreenBufferInfo(self.handle, &mut info) == 0 {
-                        return Ok(());
-                    }
-
-                    let mut attrs = info.wAttributes | FOREGROUND_INTENSITY;
-
-                    SetConsoleTextAttribute(self.handle, attrs);
+                    self.bold = true;
+                    attrs |= FOREGROUND_INTENSITY
                 },
                 _ => {}
             }
-            
+
+            self.set_text_attributes(attrs);
+
             Ok(())
         }
     }
